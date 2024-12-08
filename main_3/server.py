@@ -28,13 +28,6 @@ def server_listener():
                     user_number += 1
                     activeClients[clientAddress] = user_number
                     print(f"New client connected: {clientAddress}")
-
-                # Check for shutdown command
-                if message.lower() == "exit":
-                    print("Shutdown command received. Closing server.")
-                    running = False
-                    break
-
                 # Broadcast message to other clients
                 for client in activeClients:
                     if client != clientAddress:
