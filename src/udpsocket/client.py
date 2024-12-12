@@ -27,8 +27,14 @@ print("Connected to the chat. Type messages below:")
 while True:
     try:
         message = input()
+        if message == "./exit":
+            print("\nExiting chat.")
+            break 
         if message.strip():
             clientSocket.sendto(message.encode(), serverAddress)
+            ack, _ = clientSocket.recvfrom(1024)
+            print(f"ACK received: {ack.decode().strip()}")
+
     except KeyboardInterrupt:
         print("\nExiting chat.")
         break

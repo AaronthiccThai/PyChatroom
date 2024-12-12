@@ -10,11 +10,11 @@ serverSocket.bind(serverAddress)
 activeClients = {}
 running = True  # Flag to control server execution
 
-def server_listener():
+def serverListener():
     global running
     user_number = 0
     
-    print("Server started. Type 'exit' to stop.")
+    print(f"Server started on {serverAddress}")
     while running:
         try:
             # Set a timeout to periodically check the running flag
@@ -22,6 +22,10 @@ def server_listener():
             try:
                 message, clientAddress = serverSocket.recvfrom(1024)
                 message = message.decode().strip()
+                
+                if message.lower() == './exit':
+                    del activeClients[clientAddress]
+
 
                 # Add new clients
                 if clientAddress not in activeClients:
@@ -39,7 +43,8 @@ def server_listener():
                 if message:
                     userId = activeClients[clientAddress]
                     print(f"User<{userId}>: {message}")
-
+                    print(f"ACK<User<{userId}>> received")
+                    
             except timeout:
                 continue  # No data received, check the running flag
         except Exception as e:
@@ -47,6 +52,6 @@ def server_listener():
             break
 
 # Run the listener in a separate thread
-listener_thread = threading.Thread(target=server_listener)
+listener_thread = threading.Thread(target=serverListener)
 listener_thread.start()
 
