@@ -1,11 +1,20 @@
 import websockets
 import asyncio
+import psycopg2
+from psycopg2 import sql
 
 class ChatServer():
     def __init__(self):
-        self.activeClients = {}
-        self.credentials = {}
-        self.user_counter = 0
+        self.db_connection = psycopg2.connect(
+            dbname="chatdb",
+            user="admin",
+            password="admin",
+            host="localhost",
+            port="5432"
+        )
+        self.cursor = self.db_connection.cursor()
+        # self.activeClients = {}
+        # self.credentials = {}
         
     async def authenticate(self, websocket) -> str:
         await websocket.send("Welcome! Please register or login")
@@ -17,24 +26,41 @@ class ChatServer():
                 username = await websocket.recv()
                 await websocket.send("Enter password:")
                 password = await websocket.recv()
-                if username in self.credentials and self.credentials[username] == password:
+                
+                self.cursor.execute("SELECT password FROM users WHERE username = %s", (username,))
+                db_password = self.cursor.fetchone()
+                if db_password and db_password[0] == password:
                     await websocket.send(f"Login successful! Welcome back, {username}.")
+                    self.cursor.execute("INSERT into active_users (username) VALUES (%s)", (username,))
+                    self.db_connection.commit()                
                     return username
                 else:
-                    await websocket.send("Invalid credentials. Please try again.")                                
+                    await websocket.send("Invalid credentials. Please try again.")                             
+                # if username in self.credentials and self.credentials[username] == password:
+                #     await websocket.send(f"Login successful! Welcome back, {username}.")
+                #     return username
+                # else:
+                #     await websocket.send("Invalid credentials. Please try again.")                    
+                                
             elif command.lower() == "register":
                 await websocket.send("Please choose a username:")
                 username = await websocket.recv()
-                if username in self.credentials:
+                # if username in self.credentials:
+                #     await websocket.send("Username is already taken. Please try a different one")
+                #     continue
+                self.cursor.execute("SELECT username FROM users WHERE username = %s", (username,))
+                if self.cursor.fetchone():
                     await websocket.send("Username is already taken. Please try a different one")
-                    continue
+                    continue                           
                 await websocket.send("Please enter a password:")
                 password = await websocket.recv()
-                if len(password) <= 5: 
-                    await websocket.send("Password is too short. Please try again") 
-                    continue
-                self.credentials[username] = password
-                self.activeClients[websocket] = {'username': username, 'active': True}
+                # if len(password) <= 5: 
+                #     await websocket.send("Password is too short. Please try again") 
+                #     continue
+                self.cursor.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, password))
+                self.db_connection.commit()                
+                # self.credentials[username] = password
+                # self.activeClients[websocket] = {'username': username, 'active': True}
                 await websocket.send(f"Registration successful! Welcome, {username}.")
                 return username
             else:
