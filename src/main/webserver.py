@@ -13,9 +13,8 @@ class ChatServer():
             port="5432"
         )
         self.cursor = self.db_connection.cursor()
-        # self.activeClients = {}
-        # self.credentials = {}
-        
+        self.active_clients = {}  # {username: websocket}
+
     async def authenticate(self, websocket) -> str:
         await websocket.send("Welcome! Please register or login")
         while True:
@@ -26,65 +25,61 @@ class ChatServer():
                 username = await websocket.recv()
                 await websocket.send("Enter password:")
                 password = await websocket.recv()
-                
+
                 self.cursor.execute("SELECT password FROM users WHERE username = %s", (username,))
                 db_password = self.cursor.fetchone()
                 if db_password and db_password[0] == password:
                     await websocket.send(f"Login successful! Welcome back, {username}.")
-                    self.cursor.execute("INSERT into active_users (username) VALUES (%s)", (username,))
-                    self.db_connection.commit()                
+                    self.active_clients[username] = websocket
                     return username
                 else:
-                    await websocket.send("Invalid credentials. Please try again.")                             
-                # if username in self.credentials and self.credentials[username] == password:
-                #     await websocket.send(f"Login successful! Welcome back, {username}.")
-                #     return username
-                # else:
-                #     await websocket.send("Invalid credentials. Please try again.")                    
-                                
+                    await websocket.send("Invalid credentials. Please try again.")
+
             elif command.lower() == "register":
                 await websocket.send("Please choose a username:")
                 username = await websocket.recv()
-                # if username in self.credentials:
-                #     await websocket.send("Username is already taken. Please try a different one")
-                #     continue
                 self.cursor.execute("SELECT username FROM users WHERE username = %s", (username,))
                 if self.cursor.fetchone():
-                    await websocket.send("Username is already taken. Please try a different one")
-                    continue                           
+                    await websocket.send("Username is already taken. Please try a different one.")
+                    continue
+
                 await websocket.send("Please enter a password:")
                 password = await websocket.recv()
-                # if len(password) <= 5: 
-                #     await websocket.send("Password is too short. Please try again") 
-                #     continue
                 self.cursor.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, password))
-                self.db_connection.commit()                
-                # self.credentials[username] = password
-                # self.activeClients[websocket] = {'username': username, 'active': True}
+                self.db_connection.commit()
                 await websocket.send(f"Registration successful! Welcome, {username}.")
+                self.active_clients[username] = websocket
                 return username
+
             else:
-                await websocket.send("Invalid command. Please type either login or register")
-                                               
-        
+                await websocket.send("Invalid command. Please type either login or register.")
+
     async def deregister(self, websocket) -> None:
-        username = self.activeClients.get(websocket, None)
+        username = None
+        for user, ws in self.active_clients.items():
+            if ws == websocket:
+                username = user
+                break
         if username:
-            print(f"Connection closed: {websocket.remote_address}, {username}")
-            self.activeClients.pop(websocket, None)
-        
+            del self.active_clients[username]
+            print(f"User {username} disconnected.")
+
     async def broadcast(self, message, sender) -> None:
-        sender_info = self.activeClients.get(sender, None)
-        sender_username = sender_info['username'] if sender_info else "Unknown"
-        for client, client_info in self.activeClients.items():
-            if client != sender:
-                try:
-                    await client.send(f"<{sender_username}>: {message}")
-                except:
-                    print(f"Failed to send message to User<{client_info['username']}>.")
-                    await self.deregister(client)    
-                    
-                    
+        sender_username = None
+        for user, ws in self.active_clients.items():
+            if ws == sender:
+                sender_username = user
+                break
+
+        if sender_username:
+            for user, ws in self.active_clients.items():
+                if ws != sender:  # Avoid sending to the sender
+                    try:
+                        await ws.send(f"<{sender_username}>: {message}")
+                    except Exception as e:
+                        print(f"Failed to send message to {user}: {e}")
+                        await self.deregister(ws)
+
     async def handle_client(self, websocket) -> None:
         username = await self.authenticate(websocket)
         try:
@@ -93,11 +88,11 @@ class ChatServer():
                 await self.broadcast(message, websocket)
         finally:
             await self.deregister(websocket)
-                    
+
     async def start(self) -> None:
         server = await websockets.serve(self.handle_client, "0.0.0.0", 12345)
         await server.wait_closed()
-        
+
 if __name__ == "__main__":
     chat_server = ChatServer()
     asyncio.run(chat_server.start())

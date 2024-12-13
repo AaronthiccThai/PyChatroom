@@ -1,0 +1,11 @@
+-- start the server
+sudo systemctl start postgresql 
+
+-- stop the server
+sudo systemctl stop postgresql 
+
+ -- status of server
+sudo systemctl status postgresql
+
+-- connect to plpgsl console
+sudo -u postgres psql, \c chatdb  
