@@ -8,4 +8,5 @@ sudo systemctl stop postgresql
 sudo systemctl status postgresql
 
 -- connect to plpgsl console
-sudo -u postgres psql, \c chatdb  
+sudo -u postgres psql
+ \c chatdb  

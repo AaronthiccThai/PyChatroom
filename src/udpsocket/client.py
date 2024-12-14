@@ -8,7 +8,6 @@ serverAddress = (serverHost, serverPort)
 clientSocket = socket(AF_INET, SOCK_DGRAM)
 clientSocket.bind(("", 0))
 
-# Function to handle receiving messages
 def receive_messages():
     while True:
         try:
@@ -18,11 +17,9 @@ def receive_messages():
             print(f"Error receiving message: {e}")
             break
 
-# Start the receiving thread
 receiver_thread = Thread(target=receive_messages, daemon=True)
 receiver_thread.start()
 
-# Main thread handles sending messages
 print("Connected to the chat. Type messages below:")
 while True:
     try:
